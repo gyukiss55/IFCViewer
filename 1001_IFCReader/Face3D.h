@@ -58,7 +58,7 @@ struct Polygon3D : public Face3D {
 };
 
 struct Faces3D {
-	std::list<Face3D*> faces;
+	std::vector<Face3D*> faces;
 	Faces3D () {}
 	~Faces3D () { for (Face3D* face : faces) { delete face; } }
 

@@ -100,7 +100,7 @@ double CalculateNormal (const std::vector < Eigen::Vector3d>& polyCoords, Eigen:
 	return n.mean ();
 }
 
-int ConcavPoints (const std::vector < Eigen::Vector3d>& polyCoords, Eigen::Vector3d& n, std::map<UInt32, UInt32>& concavVector)
+int ConcavPoints (const std::vector < Eigen::Vector3d>& polyCoords, const Eigen::Vector3d& n, std::map<UInt32, UInt32>& concavVector)
 {
 	UInt32 lastAdd = 0;
 	Eigen::Vector3d p1 (polyCoords[polyCoords.size () - 2]);
@@ -158,6 +158,54 @@ void CalcBBox (const std::vector < Eigen::Vector3d>& polyCoords, Eigen::Vector3d
 	}
 }
 
+int ShiftCoordsAndConcavs (std::vector < Eigen::Vector3d>& polyCoords, std::map<UInt32, UInt32>& concavVector, const Eigen::Vector3d& normal)
+{
+	if (concavVector.size () < 1)
+		return 0;
+	int concavNum1 = concavVector.size ();
+	std::pair<int, int> maxGap (-1, -1);
+	std::pair<int, int> firstLast (-1, -1);
+	for (auto concavPair : concavVector) {
+		if (firstLast.first < 0) {
+			firstLast.first = concavPair.first;
+			maxGap.first = concavPair.first;
+		}
+		else if (firstLast.second >= 0) {
+			if (maxGap.second < 0)
+				maxGap.second = concavPair.first;
+			else {
+				if ((concavPair.first - firstLast.second) > (maxGap.second - maxGap.first)) {
+					maxGap.first = firstLast.second;
+					maxGap.second = concavPair.first;
+				}
+			}
+		}
+
+		firstLast.second = concavPair.first;
+	}
+	int shiftNum = 0;
+	if (maxGap.second < 0)
+		shiftNum = polyCoords.size () - maxGap.first - 1;
+	else if ((polyCoords.size () - firstLast.second + firstLast.first) > (maxGap.second - maxGap.first))
+		shiftNum = polyCoords.size () - firstLast.second - 1;
+	else
+		shiftNum = polyCoords.size () - maxGap.first - 1;
+
+	if (shiftNum > 0) {
+		std::vector<Eigen::Vector3d> polyCoordsTmp;
+		for (UInt32 i = 0, j = polyCoords.size () - shiftNum; i < polyCoords.size (); ++i, ++j) {
+			if (j >= polyCoords.size ()) {
+				j -= polyCoords.size ();
+			}
+			polyCoordsTmp.push_back (polyCoords[j]);
+		}
+		concavVector.clear ();
+		ConcavPoints (polyCoordsTmp, normal, concavVector);
+		polyCoords = polyCoordsTmp;
+	}
+	return shiftNum;
+}
+
 int Triangulate (const std::vector < Eigen::Vector3d>& polyCoords, std::vector<std::array<Eigen::Vector3d, 3>>& triangles)
 {
 	Eigen::Vector3d normal (0.,0.,0.);
@@ -178,6 +226,7 @@ int Triangulate (const std::vector < Eigen::Vector3d>& polyCoords, std::vector<s
 	else {
 		std::vector<Eigen::Vector3d> polyCoordsTmp (polyCoords);
 		UInt32 num = concavVector.size ();
+/* Debug view
 		{
 			Eigen::Vector3d bboxMin;
 			Eigen::Vector3d bboxMax;
@@ -187,6 +236,7 @@ int Triangulate (const std::vector < Eigen::Vector3d>& polyCoords, std::vector<s
 			DebugPolygon (polyCoords, offset);
 			DebugPoints (polyCoords, concavVector, offset);
 		}
+*/
 		printf_s ("1.  polyCoordsTmp num:%d , concavVector: %d\n", polyCoordsTmp.size (), concavVector.size ());
 		for (UInt32 ci = 0; ci < num; ++ci) {
 			if (concavVector.size () == 0) {
@@ -213,27 +263,17 @@ int Triangulate (const std::vector < Eigen::Vector3d>& polyCoords, std::vector<s
 				concavVector.erase (concavVector.begin ());
 			}
 			else {
+
+				ShiftCoordsAndConcavs (polyCoordsTmp, concavVector, normal);
+
 				std::map<UInt32, UInt32> removed;
-				auto it1 = concavVector.begin ();
-				UInt32 i0 = it1->first;
-				for (UInt32 j = 1; j < concavVector.size (); ++j) {
-					auto it2 = ++it1;
-					if (it2->first - i0 > 1)
-						break;
-					i0 = it2->first;
-					it1 = it2;
-				}
-				UInt32 i00 = polyCoordsTmp.size () - 1;
-				if (i0 > 0)
-					i00 = i0 - 1;
-				UInt32 i2 = i0 + 1;
-				if (i2 >= polyCoordsTmp.size ())
-					i2 = 0;
+				UInt32 i00 = polyCoordsTmp.size () - 2;
+				UInt32 i0 = polyCoordsTmp.size () - 1;
+				UInt32 i2 = 0;
+
 				for (UInt32 i = 0; i < polyCoordsTmp.size () - 2; ++i) {
 					UInt32 i1 = i2;
 					i2 = i1 + 1;
-					if (i2 >= polyCoordsTmp.size ())
-						i2 = 0;
 					std::array<Eigen::Vector3d, 3> triangle;
 					triangle[0] = polyCoordsTmp[i0];
 					triangle[1] = polyCoordsTmp[i1];
@@ -242,7 +282,7 @@ int Triangulate (const std::vector < Eigen::Vector3d>& polyCoords, std::vector<s
 					removed[i1] = 1;
 					Eigen::Vector3d n00 = (polyCoordsTmp[i00] - polyCoordsTmp[i0]).cross (polyCoordsTmp[i1] - polyCoordsTmp[i0]);
 					Eigen::Vector3d n01 = (polyCoordsTmp[i00] - polyCoordsTmp[i0]).cross (polyCoordsTmp[i2] - polyCoordsTmp[i0]);
-					if (n00.dot (n01) < -Eps || concavVector.count (i2) > 0) {
+					if (normal.dot (n01) < -SmallEps || concavVector.count (i2) > 0) {
 						std::vector<Eigen::Vector3d> polyCoordsTmp2;
 						for (UInt32 k = 0; k < polyCoordsTmp.size (); ++k) {
 							if (removed.count (k) > 0)

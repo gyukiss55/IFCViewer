@@ -654,7 +654,7 @@ DWORD IFCParser::GetProduct (DWORD shapeRep)
     return 0;
 }
 
-void IFCParser::GetColor (DWORD shapeRep, Eigen::Vector3d& color3)
+void IFCParser::GetColorRepItem (DWORD repItem, Eigen::Vector3d& color3)
 {
     /*
 #153= IFCCOLOURRGB($,0.152590218967,0.84489204242,0.84489204242);
@@ -663,8 +663,8 @@ void IFCParser::GetColor (DWORD shapeRep, Eigen::Vector3d& color3)
 #157= IFCPRESENTATIONSTYLEASSIGNMENT((#155));
 #159= IFCSTYLEDITEM(#151,(#157),$);
     */
-    for (DWORD ref1 : referencesMap[shapeRep]) {
-        for (DWORD inv1 : inverzMap[ref1]) {
+
+    for (DWORD inv1 : inverzMap[repItem]) {
             if (IsEntityType (inv1, std::string ("IFCSTYLEDITEM"))) {
                 for (DWORD ref2 : referencesMap[inv1]) {
                     if (IsEntityType (ref2, std::string ("IFCPRESENTATIONSTYLEASSIGNMENT"))) {
@@ -685,6 +685,12 @@ void IFCParser::GetColor (DWORD shapeRep, Eigen::Vector3d& color3)
                 }
             }
         }
+}
+
+void IFCParser::GetColorShapeRep (DWORD shapeRep, Eigen::Vector3d& color3)
+{
+    for (DWORD ref1 : referencesMap[shapeRep]) {
+        return GetColorRepItem (ref1, color3);
     }
 }
 
@@ -854,6 +860,8 @@ DWORD IFCParser::GetFaces (std::vector<DWORD> shapeReps, Faces3D& faces3D, std::
                     this->geomSubContextId = shellOrGeom;
                 }
                 if (IsEntityType (shellOrGeom, std::string ("IFCSHELLBASEDSURFACEMODEL")) || IsEntityType (shellOrGeom, std::string ("IFCFACETEDBREP"))) {
+                    Eigen::Vector3d colorBody (0.,1.,0.);
+                    GetColorRepItem (shellOrGeom, colorBody);
                     for (DWORD openShell : referencesMap[shellOrGeom]) {
                         if (IsEntityType (openShell, std::string ("IFCOPENSHELL")) || IsEntityType (openShell, std::string ("IFCCLOSEDSHELL"))) {
                             if (IsEntityType (openShell, std::string ("IFCCLOSEDSHELL"))) {
@@ -908,6 +916,7 @@ DWORD IFCParser::GetFaces (std::vector<DWORD> shapeReps, Faces3D& faces3D, std::
                                                     facePtr->bodyIndex = bodyIndex;
                                                 else
                                                     facePtr->bodyIndex = 0;
+                                                facePtr->color = colorBody;
                                                 faces3D.faces.push_back (facePtr);
                                             }
                                             else if (coords.size () > 3) {
@@ -924,6 +933,7 @@ DWORD IFCParser::GetFaces (std::vector<DWORD> shapeReps, Faces3D& faces3D, std::
                                                         facePtr->bodyIndex = bodyIndex;
                                                     else
                                                         facePtr->bodyIndex = 0;
+                                                    facePtr->color = colorBody;
                                                     faces3D.faces.push_back (facePtr);
 
                                                 }

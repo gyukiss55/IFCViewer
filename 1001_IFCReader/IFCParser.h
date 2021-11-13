@@ -86,7 +86,8 @@ public:
     int GetAxis2Placement3D (DWORD axis2Placement3D, Eigen::MatrixXd& tran);
     DWORD GetGlobalTran (DWORD shapeRep, Eigen::MatrixXd& tran);
     void Transform (const Eigen::MatrixXd& tran, Eigen::Vector3d& vec3);
-    void GetColor (DWORD shapeRep, Eigen::Vector3d& color3);
+    void GetColorShapeRep (DWORD shapeRep, Eigen::Vector3d& color3);
+    void GetColorRepItem (DWORD repItem, Eigen::Vector3d& color3);
 };
 
 

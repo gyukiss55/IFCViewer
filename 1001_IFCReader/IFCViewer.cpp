@@ -15,6 +15,7 @@
 
 Eigen::MatrixXd V;
 Eigen::MatrixXi F;
+Eigen::MatrixXd C;
 
 static igl::opengl::glfw::Viewer * viewerPtr = nullptr;
 static Eigen::Vector3d offset = {0.,0.,0.};
@@ -106,7 +107,7 @@ int IFCViewer (int argc, char* argv[])
 
 	Faces3D faces3D;
 	std::vector<std::pair<DWORD, DWORD>> faceProductPairs;
-	ReadIFCFaces ("G:/Work/GitHub/_MyGit/Ifc2Brep/primitiv.ifc", faces3D, &faceProductPairs);
+	ReadIFCFaces ("G:/Work/GitHub/_MyGit/Ifc2Brep/primitivBREP.ifc", faces3D, &faceProductPairs);
 
 	// Plot the mesh
 	DWORD vertexNum (0);
@@ -133,6 +134,7 @@ int IFCViewer (int argc, char* argv[])
 
 	V.resize (vertexNum, 3);
 	F.resize (faceNum, 3);
+	C.resize (faceNum, 3);
 
 	DWORD vertexIndex (0);
 	DWORD faceIndex (0);
@@ -159,6 +161,9 @@ int IFCViewer (int argc, char* argv[])
 					F (faceIndex, 0) = vertexIndex;
 					F (faceIndex, 1) = vertexIndex + 1;
 					F (faceIndex, 2) = vertexIndex + 2;
+					C (faceIndex, 0) = poly->color.x ();
+					C (faceIndex, 1) = poly->color.y ();
+					C (faceIndex, 2) = poly->color.z ();
 					faceIndex++;
 					vertexIndex += 3;
 				}
@@ -188,6 +193,9 @@ int IFCViewer (int argc, char* argv[])
 					F (faceIndex, 0) = vertexIndex;
 					F (faceIndex, 1) = vertexIndex + 1;
 					F (faceIndex, 2) = vertexIndex + 2;
+					C (faceIndex, 0) = poly->color.x ();
+					C (faceIndex, 1) = poly->color.y ();
+					C (faceIndex, 2) = poly->color.z ();
 					faceIndex++;
 					vertexIndex += 3;
 				}
@@ -212,9 +220,10 @@ int IFCViewer (int argc, char* argv[])
 		}
 		printf_s ("Select fid: %d vid: %d minf: %d maxf: %d\n", fid, vid, fidMin, fidMax);
 		for (int j = 0; j < faceNum; j++) {
-			double r = 0.;
-			double g = 1.;
-			double b = 0.;
+			const Face3D* face = faces3D.faces[j];
+			double r = face->color.x ();
+			double g = face->color.y ();
+			double b = face->color.z ();
 			if (j >= fidMin && j < fidMax) {
 				r = 1.;
 				g = 0.;
@@ -258,6 +267,7 @@ int IFCViewer (int argc, char* argv[])
 	};
 
 	viewer.data ().set_mesh (V, F);
+	viewer.data ().set_colors (C);
 	viewer.launch ();
 
 	return 0;
