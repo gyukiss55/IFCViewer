@@ -247,7 +247,11 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\tutorial\1001_IFCReader\FreeTran.cpp" />
+    <ClCompile Include="..\..\..\tutorial\1001_IFCReader\GeomUtils.cpp" />
     <ClCompile Include="..\..\..\tutorial\1001_IFCReader\IFCParser.cpp" />
+    <ClCompile Include="..\..\..\tutorial\1001_IFCReader\IFCViewer.cpp" />
+    <ClCompile Include="..\..\..\tutorial\1001_IFCReader\LocalPlace.cpp" />
     <ClCompile Include="G:\Work\GitHub\libigl\tutorial\1001_IFCReader\main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -280,7 +284,12 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\tutorial\1001_IFCReader\Face3D.h" />
+    <ClInclude Include="..\..\..\tutorial\1001_IFCReader\FreeTran.h" />
+    <ClInclude Include="..\..\..\tutorial\1001_IFCReader\GeomUtils.h" />
     <ClInclude Include="..\..\..\tutorial\1001_IFCReader\IFCParser.h" />
+    <ClInclude Include="..\..\..\tutorial\1001_IFCReader\IFCViewer.h" />
+    <ClInclude Include="..\..\..\tutorial\1001_IFCReader\LocalPlace.h" />
+    <ClInclude Include="..\..\..\tutorial\1001_IFCReader\Real.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

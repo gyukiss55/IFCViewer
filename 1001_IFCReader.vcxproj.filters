@@ -7,6 +7,18 @@
     <ClCompile Include="..\..\..\tutorial\1001_IFCReader\IFCParser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tutorial\1001_IFCReader\IFCViewer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tutorial\1001_IFCReader\GeomUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tutorial\1001_IFCReader\LocalPlace.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tutorial\1001_IFCReader\FreeTran.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="G:\Work\GitHub\libigl\tutorial\1001_IFCReader\CMakeLists.txt" />
@@ -21,6 +33,21 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tutorial\1001_IFCReader\Face3D.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tutorial\1001_IFCReader\IFCViewer.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tutorial\1001_IFCReader\GeomUtils.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tutorial\1001_IFCReader\LocalPlace.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tutorial\1001_IFCReader\Real.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tutorial\1001_IFCReader\FreeTran.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

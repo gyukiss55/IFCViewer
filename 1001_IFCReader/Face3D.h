@@ -3,23 +3,23 @@
 #include <array>
 #include <list>
 #include <vector>
+#include <igl/opengl/glfw/Viewer.h>
 
-typedef std::array<float, 3> Vector3D;
 
-const Vector3D nullVector3D ({ 0.f, 0.f, 0.f });
+const Eigen::Vector3d nullVector3D ({ 0.f, 0.f, 0.f });
 
-const Vector3D RedColor3D ({ 1.f, 0.f, 0.f });
-const Vector3D BlueColor3D ({ 0.f, 0.f, 1.f });
-const Vector3D GreenColor3D ({ 0.f, 1.f, 0.f });
-const Vector3D YellowColor3D ({ 1.f, 1.f, 0.f });
-const Vector3D PurpleColor3D ({ 1.f, 0.f, 1.f });
-const Vector3D CyanColor3D ({ 0.f, 1.f, 1.f });
-const Vector3D DRedColor3D ({ 0.5f, 0.f, 0.f });
-const Vector3D DBlueColor3D ({ 0.f, 0.f, .5f });
-const Vector3D DGreenColor3D ({ 0.f, .5f, 0.f });
-const Vector3D DYellowColor3D ({ .5f, .5f, 0.f });
-const Vector3D DPurpleColor3D ({ .5f, 0.f, .5f });
-const Vector3D DCyanColor3D ({ 0.f, .5f, .5f });
+const Eigen::Vector3d RedColor3D ({ 1.f, 0.f, 0.f });
+const Eigen::Vector3d BlueColor3D ({ 0.f, 0.f, 1.f });
+const Eigen::Vector3d GreenColor3D ({ 0.f, 1.f, 0.f });
+const Eigen::Vector3d YellowColor3D ({ 1.f, 1.f, 0.f });
+const Eigen::Vector3d PurpleColor3D ({ 1.f, 0.f, 1.f });
+const Eigen::Vector3d CyanColor3D ({ 0.f, 1.f, 1.f });
+const Eigen::Vector3d DRedColor3D ({ 0.5f, 0.f, 0.f });
+const Eigen::Vector3d DBlueColor3D ({ 0.f, 0.f, .5f });
+const Eigen::Vector3d DGreenColor3D ({ 0.f, .5f, 0.f });
+const Eigen::Vector3d DYellowColor3D ({ .5f, .5f, 0.f });
+const Eigen::Vector3d DPurpleColor3D ({ .5f, 0.f, .5f });
+const Eigen::Vector3d DCyanColor3D ({ 0.f, .5f, .5f });
 
 struct Face3D {
 	enum Face3DTypeEnum {
@@ -30,29 +30,29 @@ struct Face3D {
 	};
 
 	Face3DTypeEnum type;
-	Vector3D color;
+	Eigen::Vector3d color;
+	unsigned long bodyIndex;
 
-
-	Face3D () : type (Face3DType), color (nullVector3D) {}
-	Face3D (Face3DTypeEnum t) : type (t), color (nullVector3D) {}
+	Face3D () : type (Face3DType), color (nullVector3D), bodyIndex (0) {}
+	Face3D (Face3DTypeEnum t) : type (t), color (nullVector3D), bodyIndex (0) {}
 	~Face3D () {}
 };
 
 
 struct Triangle3D : public Face3D {
-	std::array <Vector3D, 3> coords;
+	std::array <Eigen::Vector3d, 3> coords;
 
 	Triangle3D () : Face3D (Triangle3DType), coords ( {nullVector3D, nullVector3D, nullVector3D}) {}
 };
 
 struct Quad3D : public Face3D {
-	std::array <Vector3D, 4> coords;
+	std::array <Eigen::Vector3d, 4> coords;
 
 	Quad3D () : Face3D (Quad3DType), coords({ nullVector3D, nullVector3D, nullVector3D, nullVector3D}) {}
 };
 
 struct Polygon3D : public Face3D {
-	std::vector <Vector3D> coords;
+	std::vector <Eigen::Vector3d> coords;
 
 	Polygon3D () : Face3D (Polygon3DType) {}
 };
@@ -61,4 +61,5 @@ struct Faces3D {
 	std::list<Face3D*> faces;
 	Faces3D () {}
 	~Faces3D () { for (Face3D* face : faces) { delete face; } }
+
 };

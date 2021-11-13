@@ -13,18 +13,8 @@
 
 #include "IFCParser.h"
 #include "face3D.h"
+#include "GeomUtils.h"
 
-#ifdef __USE_GLMATRIX__
-
-#include "glMatrix.h"
-
-class MatrixOnStack {
-public:
-            MatrixOnStack () { gl_push_matrix (); gl_load_identity ();  }
-virtual    ~MatrixOnStack () { gl_pop_matrix ();  }
-};
-
-#endif // __USE_GLMATRIX__
 
 
 bool IFCParser::CheckClosedBody (const std::vector<std::vector<DWORD>>& cpPoly, std::vector<std::vector<std::pair<DWORD, bool>>>& closedBodies)
@@ -606,7 +596,7 @@ DWORD IFCParser::Run (Faces3D& faces, std::vector<std::pair<DWORD, DWORD>>* face
 }
 
 
-bool IFCParser::GetVector3D (DWORD cpInst, DWORD offset, Vector3D& vec3)
+bool IFCParser::GetVector3D (DWORD cpInst, DWORD offset, Eigen::Vector3d& vec3)
 {
     DWORD index = entityMap[cpInst];
     const auto& entity = entityVector[index];
@@ -616,24 +606,15 @@ bool IFCParser::GetVector3D (DWORD cpInst, DWORD offset, Vector3D& vec3)
             i += offset;
             float x = 0., y = 0., z = 0.;
             sscanf_s (readBuffer + p0 + i, "%f,%f,%f", &x, &y, &z);
-            vec3 = Vector3D {x, y, z};
+            vec3 = Eigen::Vector3d {x, y, z};
             return true;
         }
     }
     return false;
 }
 
-#ifdef __USE_GLMATRIX__
-void IFCParser::Transform (Vector3D& vec3)
-{
-    Vector3D& vecResult (vec3);
-    gl_mult_matrixf (vec3[0], vec3[1], vec3[2], vecResult[0], vecResult[1], vecResult[2]);
-    vecResult[0] *= scaling;
-    vecResult[1] *= scaling;
-    vecResult[2] *= scaling;
-}
-#else
-void IFCParser::Transform (const Eigen::MatrixXd& tran, Vector3D& vec3)
+
+void IFCParser::Transform (const Eigen::MatrixXd& tran, Eigen::Vector3d& vec3)
 {
     Eigen::Vector4d v;
     v << vec3[0] , vec3[1] , vec3[2] , 1.0;
@@ -642,7 +623,6 @@ void IFCParser::Transform (const Eigen::MatrixXd& tran, Vector3D& vec3)
     vec3[1] = (float)vr.y () * scaling;
     vec3[2] = (float)vr.z () * scaling;
 }
-#endif // __USE_GLMATRIX__
 
 
 bool IFCParser::HasIFCGUID (DWORD stepIndex)
@@ -674,7 +654,7 @@ DWORD IFCParser::GetProduct (DWORD shapeRep)
     return 0;
 }
 
-void IFCParser::GetColor (DWORD shapeRep, Vector3D& color3)
+void IFCParser::GetColor (DWORD shapeRep, Eigen::Vector3d& color3)
 {
     /*
 #153= IFCCOLOURRGB($,0.152590218967,0.84489204242,0.84489204242);
@@ -719,13 +699,93 @@ void printMatrix (const char* str, Eigen::MatrixXd& tran)
 }
 
 
-DWORD IFCParser::GetGlobalTran (DWORD shapeRep
-#ifdef __USE_GLMATRIX__ 
-#else
-    , Eigen::MatrixXd& tran
-#endif
-)
+int IFCParser::GetAxis2Placement3D (DWORD axis2Placement3D, Eigen::MatrixXd& tran)
 {
+    Eigen::MatrixXd tran1 (4, 4);
+    tran1 << 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.;
+    tran = tran1;
+
+    if (!IsEntityType (axis2Placement3D, std::string ("IFCAXIS2PLACEMENT3D"))) 
+        return -1;
+
+    int axis = 0;
+    Eigen::Vector3d translate;
+    Eigen::Vector3d axis1 ({ 1.f, 0.f, 0.f });
+    Eigen::Vector3d axis3 ({ 0.f, 0.f, 1.f });
+    Eigen::Vector3d axis2 ({ 0.f, 1.f, 0.f });
+    for (DWORD ref2 : referencesMap[axis2Placement3D]) {
+        if (IsEntityType (ref2, std::string ("IFCCARTESIANPOINT"))) {
+            GetVector3D (ref2, 2, translate);
+        }
+        if (IsEntityType (ref2, std::string ("IFCDIRECTION"))) {
+            if (axis == 0) {
+                GetVector3D (ref2, 2, axis3);
+                axis++;
+            }
+            else {
+                GetVector3D (ref2, 2, axis1);
+                axis2[0] = axis3[1] * axis1[2] - axis3[2] * axis1[1];
+                axis2[1] = axis3[2] * axis1[0] - axis3[0] * axis1[2];
+                axis2[2] = axis3[0] * axis1[1] - axis3[1] * axis1[0];
+            }
+
+        }
+    }
+    
+    tran1 << (double)axis1[0], (double)axis2[0], (double)axis3[0], (double)translate[0], (double)axis1[1], (double)axis2[1], (double)axis3[1], (double)translate[1], (double)axis1[2], (double)axis2[2], (double)axis3[2], (double)translate[2], 0., 0., 0., 1.;
+    tran = tran1;
+        //printMatrix ("Tran1", tran1);
+    return 0;
+}
+
+
+bool IFCParser::GetMappedShapeRep (DWORD shapeRep, DWORD& mappedShapeRep)
+{
+    mappedShapeRep = 0;
+    for (DWORD ref1 : referencesMap[shapeRep]) {
+        if (IsEntityType (ref1, std::string ("IFCMAPPEDITEM"))) {
+            for (DWORD ref2 : referencesMap[ref1]) {
+                if (IsEntityType (ref2, std::string ("IFCREPRESENTATIONMAP"))) {
+                    for (DWORD ref3 : referencesMap[ref2]) {
+                        if (IsEntityType (ref3, std::string ("IFCSHAPEREPRESENTATION"))) {
+                            mappedShapeRep = ref3;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+
+bool IFCParser::GetMappedTran (DWORD shapeRep, Eigen::MatrixXd& tran)
+{
+    Eigen::MatrixXd tran1 (4, 4);
+    tran1 << 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.;
+    tran = tran1;
+    for (DWORD ref1 : referencesMap[shapeRep]) {
+        if (IsEntityType (ref1, std::string ("IFCMAPPEDITEM"))) {
+            for (DWORD ref2 : referencesMap[ref1]) {
+                if (IsEntityType (ref2, std::string ("IFCREPRESENTATIONMAP"))) {
+                    for (DWORD ref3 : referencesMap[ref2]) {
+                        if (IsEntityType (ref3, std::string ("IFCAXIS2PLACEMENT3D"))) {
+                            GetAxis2Placement3D (ref3, tran);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+
+DWORD IFCParser::GetGlobalTran (DWORD shapeRep, Eigen::MatrixXd& tran)
+{
+    GetMappedTran (shapeRep, tran);
     for (DWORD inv1 : inverzMap[shapeRep]) {
         if (IsEntityType (inv1, std::string ("IFCPRODUCTDEFINITIONSHAPE"))) {
             for (DWORD inv2 : inverzMap[inv1]) {
@@ -738,59 +798,14 @@ DWORD IFCParser::GetGlobalTran (DWORD shapeRep
                             localPlacements.pop_back ();
                             for (DWORD ref1 : referencesMap[lp]) {
                                 if (IsEntityType (ref1, std::string ("IFCAXIS2PLACEMENT3D"))) {
-                                    int axis = 0;
-                                    Vector3D translate;
-                                    Vector3D axis1 ({ 1.f, 0.f, 0.f });
-                                    Vector3D axis3 ({ 0.f, 0.f, 1.f });
-                                    Vector3D axis2 ({ 0.f, 1.f, 0.f });
-                                    for (DWORD ref2 : referencesMap[ref1]) {
-                                        if (IsEntityType (ref2, std::string ("IFCCARTESIANPOINT"))) {
-                                            GetVector3D (ref2, 2, translate);
-                                        }
-                                        if (IsEntityType (ref2, std::string ("IFCDIRECTION"))) {
-                                            if (axis == 0) {
-                                                GetVector3D (ref2, 2, axis3);
-                                                axis++;
-                                            }
-                                            else {
-                                                GetVector3D (ref2, 2, axis1);
-                                                axis2[0] = axis3[1] * axis1[2] - axis3[2] * axis1[1];
-                                                axis2[1] = axis3[2] * axis1[0] - axis3[0] * axis1[2];
-                                                axis2[2] = axis3[0] * axis1[1] - axis3[1] * axis1[0];
-                                            }
-                                                
-                                        }
-                                    }
-#ifdef __USE_GLMATRIX__
-                                    float mat[16];
-                                    mat[0] = axis1[0];
-                                    mat[1] = axis2[0];
-                                    mat[2] = axis3[0];
-                                    mat[3] = 0.f;
-                                    mat[4] = axis1[1];
-                                    mat[5] = axis2[1];
-                                    mat[6] = axis3[1];
-                                    mat[7] = 0.f;
-                                    mat[8] = axis1[2];
-                                    mat[9] = axis2[2];
-                                    mat[10] = axis3[2];
-                                    mat[11] = 0.f;
-                                    mat[12] = translate[0];
-                                    mat[13] = translate[1];
-                                    mat[14] = translate[2];
-                                    mat[15] = 0.f;
-                                    gl_mult_matrixf (mat);
-#else
                                     Eigen::MatrixXd tran1 (4, 4);
-                                    tran1 << (double)axis1[0], (double)axis2[0], (double)axis3[0], (double)translate[0], (double)axis1[1], (double)axis2[1], (double)axis3[1], (double)translate[1], (double)axis1[2], (double)axis2[2], (double)axis3[2], (double)translate[2], 0., 0., 0., 1.;
-
- //                                   printMatrix ("Tran1", tran1);
+                                    GetAxis2Placement3D (ref1, tran1);
 
                                     Eigen::MatrixXd tranResult (4, 4);
                                     tranResult = tran1 * tran;
  //                                   printMatrix ("TranResult", tranResult);
                                     tran = tranResult;
-#endif // __USE_GLMATRIX__
+
                                 } else
                                 if (IsEntityType (ref1, std::string ("IFCLOCALPLACEMENT"))) {
                                     localPlacements.push_back (ref1);
@@ -809,47 +824,56 @@ DWORD IFCParser::GetGlobalTran (DWORD shapeRep
 
 DWORD IFCParser::GetFaces (std::vector<DWORD> shapeReps, Faces3D& faces3D, std::vector<std::pair<DWORD, DWORD>>* faceProductPairs/* = nullptr*/)
 {
-    for (DWORD shapeRep : shapeReps) {
+    for (DWORD shapeRep1 : shapeReps) {
         // process one shapeRep
 
-#ifdef __USE_GLMATRIX__
-        MatrixOnStack matrixOnStack;
-        GetGlobalTran (shapeRep);
-#else
         Eigen::MatrixXd tran (4, 4);
         tran << 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.;
-        GetGlobalTran (shapeRep, tran);
-#endif // __USE_GLMATRIX__
+        GetGlobalTran (shapeRep1, tran);
 
         std::vector<DWORD> faces;
         std::vector<std::vector<DWORD>> cpPoly;
         std::vector<DWORD> polyLoops;
-        std::map<std::size_t, std::pair<DWORD, Vector3D>> uniqueCP;
+        std::map<std::size_t, std::pair<DWORD, Eigen::Vector3d>> uniqueCP;
+
+        static unsigned long bodyIndex = 0;
+        bool closedShell = false;
 
         if (faceProductPairs != nullptr) {
-            DWORD productRef = GetProduct (shapeRep);
+            DWORD productRef = GetProduct (shapeRep1);
             if (productRef != 0)
                 faceProductPairs->push_back (std::pair<DWORD, DWORD> ((DWORD)faces3D.faces.size (), productRef));
         }
+        DWORD shapeRep = 0;
+        if (!GetMappedShapeRep (shapeRep1, shapeRep))
+            shapeRep = shapeRep1;
 
-        if (referencesMap[shapeRep].size () > 5) {
+        if (referencesMap[shapeRep].size () > 0) {
             for (DWORD shellOrGeom : referencesMap[shapeRep]) {
                 if (this->geomSubContextId == 0 && IsEntityType (shellOrGeom, std::string ("IFCGEOMETRICREPRESENTATIONSUBCONTEXT"))) {
                     this->geomSubContextId = shellOrGeom;
                 }
-                if (IsEntityType (shellOrGeom, std::string ("IFCSHELLBASEDSURFACEMODEL"))) {
+                if (IsEntityType (shellOrGeom, std::string ("IFCSHELLBASEDSURFACEMODEL")) || IsEntityType (shellOrGeom, std::string ("IFCFACETEDBREP"))) {
                     for (DWORD openShell : referencesMap[shellOrGeom]) {
-                        if (IsEntityType (openShell, std::string ("IFCOPENSHELL"))) {
+                        if (IsEntityType (openShell, std::string ("IFCOPENSHELL")) || IsEntityType (openShell, std::string ("IFCCLOSEDSHELL"))) {
+                            if (IsEntityType (openShell, std::string ("IFCCLOSEDSHELL"))) {
+                                ++bodyIndex;
+                                closedShell = true;
+                            }
+                            else {
+                                closedShell = false;
+                            }
                             for (DWORD face : referencesMap[openShell]) {
                                 if (IsEntityType (face, std::string ("IFCFACE"))) {
                                     faces.push_back (face);
                                     for (DWORD outer : referencesMap[face]) {
                                         if (IsEntityType (outer, std::string ("IFCFACEOUTERBOUND"))) {
-                                                std::vector<Vector3D> coords;  
-                                                for (DWORD poly : referencesMap[outer]) {
+                                            std::vector<Eigen::Vector3d> coords;  
+                                            for (DWORD poly : referencesMap[outer]) {
 
-                                                    
+
                                                 if (IsEntityType (poly, std::string ("IFCPOLYLOOP"))) {
+                                                    printf_s ("IFCPOLYLOOP:#%d\n", poly);
                                                     deleteEntityMap[poly] = 1;
                                                     polyLoops.push_back (poly);
 
@@ -857,20 +881,16 @@ DWORD IFCParser::GetFaces (std::vector<DWORD> shapeReps, Faces3D& faces3D, std::
                                                     for (DWORD cp : referencesMap[poly]) {
                                                         std::size_t hachCp = GetHashCode (cp);
                                                         if (uniqueCP.count (hachCp) == 0) {
-                                                            Vector3D  vec3;
+                                                            Eigen::Vector3d  vec3;
                                                             GetVector3D (cp, 2, vec3);
-#ifdef __USE_GLMATRIX__
-                                                            Transform (vec3);
-#else
                                                             Transform (tran, vec3);
-#endif // __USE_GLMATRIX__
-                                                            std::pair<DWORD, Vector3D> p (cp, vec3);
+                                                            std::pair<DWORD, Eigen::Vector3d> p (cp, vec3);
                                                             uniqueCP[hachCp] = p;
                                                             coords.push_back (vec3);
                                                         }
                                                         else {
                                                             cp = uniqueCP[hachCp].first;
-                                                            Vector3D  vec3 = uniqueCP[hachCp].second;
+                                                            Eigen::Vector3d  vec3 = uniqueCP[hachCp].second;
                                                             coords.push_back (vec3);
                                                         }
                                                         cpVector.push_back (cp);
@@ -878,11 +898,35 @@ DWORD IFCParser::GetFaces (std::vector<DWORD> shapeReps, Faces3D& faces3D, std::
                                                     cpPoly.push_back (cpVector);
                                                 }
                                             }
-                                            if (coords.size () >= 3) {
-                                                Polygon3D* facePtr = new Polygon3D ();
+                                            if (coords.size () == 3) {
+                                                Triangle3D* facePtr = new Triangle3D ();
                                                 facePtr->color = RedColor3D;
-                                                facePtr->coords = coords;
+                                                facePtr->coords[0] = coords[0];
+                                                facePtr->coords[1] = coords[1];
+                                                facePtr->coords[2] = coords[2];
+                                                if (closedShell)
+                                                    facePtr->bodyIndex = bodyIndex;
+                                                else
+                                                    facePtr->bodyIndex = 0;
                                                 faces3D.faces.push_back (facePtr);
+                                            }
+                                            else if (coords.size () > 3) {
+                                                std::vector<std::array<Eigen::Vector3d, 3>> triangles;
+
+                                                GeomUtils::Triangulate (coords, triangles);
+                                                for (const std::array<Eigen::Vector3d, 3>&triangle : triangles) {
+                                                    Triangle3D* facePtr = new Triangle3D ();
+                                                    facePtr->color = RedColor3D;
+                                                    facePtr->coords[0] = triangle[0];
+                                                    facePtr->coords[1] = triangle[1];
+                                                    facePtr->coords[2] = triangle[2];
+                                                    if (closedShell)
+                                                        facePtr->bodyIndex = bodyIndex;
+                                                    else
+                                                        facePtr->bodyIndex = 0;
+                                                    faces3D.faces.push_back (facePtr);
+
+                                                }
                                             }
                                         }
                                     }

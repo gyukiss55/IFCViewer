@@ -7,12 +7,10 @@
 #include <map>
 #include <string>
 
-#ifdef __USE_GLMATRIX__
-#else
 #include <igl/opengl/glfw/Viewer.h>
-#endif // __USE_GLMATRIX__
 
 #include "face3D.h"
+
 
 #define PRIM1 514229
 #define PRIM2 433494437
@@ -80,17 +78,15 @@ public:
     DWORD Run (const char* outfilename);
     DWORD Run (Faces3D& faces, std::vector<std::pair<DWORD, DWORD>>* faceProductPairs = nullptr);
     DWORD GetFaces (std::vector<DWORD> shapeReps, Faces3D& faces, std::vector<std::pair<DWORD, DWORD>>* faceProductPairs = nullptr);
-    bool GetVector3D (DWORD cpInst, DWORD offset, Vector3D& vec3);
+    bool GetVector3D (DWORD cpInst, DWORD offset, Eigen::Vector3d& vec3);
     DWORD GetProduct (DWORD shapeRep);
     bool HasIFCGUID (DWORD stepIndex);
-#ifdef __USE_GLMATRIX__
-    DWORD GetGlobalTran (DWORD shapeRep);
-    void Transform (Vector3D& vec3);
-#else
+    bool GetMappedTran (DWORD shapeRep, Eigen::MatrixXd& tran);
+    bool GetMappedShapeRep (DWORD shapeRep, DWORD& mappedShapeRep);
+    int GetAxis2Placement3D (DWORD axis2Placement3D, Eigen::MatrixXd& tran);
     DWORD GetGlobalTran (DWORD shapeRep, Eigen::MatrixXd& tran);
-    void Transform (const Eigen::MatrixXd& tran, Vector3D& vec3);
-#endif // __USE_GLMATRIX__
-    void GetColor (DWORD shapeRep, Vector3D& color3);
+    void Transform (const Eigen::MatrixXd& tran, Eigen::Vector3d& vec3);
+    void GetColor (DWORD shapeRep, Eigen::Vector3d& color3);
 };
 
 
