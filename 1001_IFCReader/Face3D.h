@@ -5,6 +5,7 @@
 #include <vector>
 #include <igl/opengl/glfw/Viewer.h>
 
+#include "Real.h"
 
 const Eigen::Vector3d nullVector3D ({ 0.f, 0.f, 0.f });
 
@@ -52,7 +53,8 @@ struct Quad3D : public Face3D {
 };
 
 struct Polygon3D : public Face3D {
-	std::vector <Eigen::Vector3d> coords;
+	std::vector <Eigen::Vector3d> outerLoop;
+	std::vector<std::vector <Eigen::Vector3d>> innerLoops;
 
 	Polygon3D () : Face3D (Polygon3DType) {}
 };
@@ -61,5 +63,22 @@ struct Faces3D {
 	std::vector<Face3D*> faces;
 	Faces3D () {}
 	~Faces3D () { for (Face3D* face : faces) { delete face; } }
+	int Delete (UInt32 i)
+	{
+		if (i < faces.size ()) {
+			delete faces[i];
+			faces.erase (faces.begin () + i);
+			return faces.size ();
+		}
+		return -1;
+	}
+};
 
+struct OuterInnerLink {
+	UInt32 outerIndex;
+	UInt32 innerLoop;
+	UInt32 innerIndex;
+
+	OuterInnerLink () : outerIndex (0), innerLoop (0), innerIndex (0) {}
+	OuterInnerLink (UInt32 o, UInt32 l, UInt32 i) : outerIndex (o), innerLoop (l), innerIndex (i) {}
 };

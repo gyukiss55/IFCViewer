@@ -13,6 +13,8 @@
 #include "GeomUtils.h"
 #include "LocalPlace.h"
 
+#define FILENAME_IFC "G:/Work/GitHub/_MyGit/Ifc2Brep/wallSlab4.ifc"
+
 Eigen::MatrixXd V;
 Eigen::MatrixXi F;
 Eigen::MatrixXd C;
@@ -28,6 +30,41 @@ viewer.data ().add_edges (V + PD1 * avg, V - PD1 * avg, blue);
 
 viewer.data ().add_points (V_box, Eigen::RowVector3d (1, 0, 0));
 */
+
+void DebugCrossSection (const Eigen::Vector3d& p1, const Eigen::Vector3d& p2, const Eigen::Vector3d& p3, const Eigen::Vector3d& p4, const Eigen::Vector3d& pc)
+{
+	static double z = 0.0;
+	z += .2;
+
+	Eigen::MatrixXd VD;
+	Eigen::MatrixXd CD;
+	VD.resize (1, 3);
+	VD (0, 0) = pc.x ();
+	VD (0, 1) = pc.y ();
+	VD (0, 2) = pc.z () + z;
+
+	viewerPtr->data ().add_points (VD, Eigen::RowVector3d (0.,0.5,0.5));
+
+
+	Eigen::MatrixXd VD1;
+	Eigen::MatrixXd VD2;
+	VD1.resize (2, 3);
+	VD2.resize (2, 3);
+	VD1 (0, 0) = p1.x ();
+	VD1 (0, 1) = p1.y ();
+	VD1 (0, 2) = p1.z () + z;
+	VD2 (0, 0) = p2.x ();
+	VD2 (0, 1) = p2.y ();
+	VD2 (0, 2) = p2.z () + z;
+	VD1 (1, 0) = p3.x ();
+	VD1 (1, 1) = p3.y ();
+	VD1 (1, 2) = p3.z () + z;
+	VD2 (1, 0) = p4.x ();
+	VD2 (1, 1) = p4.y ();
+	VD2 (1, 2) = p4.z () + z;
+	viewerPtr->data ().add_edges (VD1, VD2, Eigen::RowVector3d (0.5, 0.5, 0));
+}
+
 
 void DebugPolygon (const std::vector<Eigen::Vector3d>& coords, const Eigen::Vector3d& offset)
 {
@@ -99,6 +136,27 @@ void DebugPoints (const std::vector<Eigen::Vector3d>& coords, const std::map<UIn
 	viewerPtr->data ().add_points (VD, CD);
 }
 
+void DebugPoints (const Eigen::Vector3d& coord, const Eigen::Vector3d& color, const Eigen::Vector3d& offset)
+{
+	if (viewerPtr == nullptr)
+		return;
+	Eigen::MatrixXd VD;
+	Eigen::MatrixXd CD;
+	VD.resize (1, 3);
+	CD.resize (1, 3);
+
+	VD (0, 0) = coord.x () + offset.x ();
+	VD (0, 1) = coord.y () + offset.y ();
+	VD (0, 2) = coord.z () + offset.z ();
+
+	CD (0, 0) = color.x ();
+	CD (0, 1) = color.y ();
+	CD (0, 2) = color.z ();
+
+	viewerPtr->data ().add_points (VD, CD);
+
+}
+
 
 int IFCViewer (int argc, char* argv[])
 {
@@ -107,7 +165,7 @@ int IFCViewer (int argc, char* argv[])
 
 	Faces3D faces3D;
 	std::vector<std::pair<DWORD, DWORD>> faceProductPairs;
-	ReadIFCFaces ("G:/Work/GitHub/_MyGit/Ifc2Brep/primitivBREP.ifc", faces3D, &faceProductPairs);
+	ReadIFCFaces (FILENAME_IFC, faces3D, &faceProductPairs);
 
 	// Plot the mesh
 	DWORD vertexNum (0);
@@ -121,8 +179,8 @@ int IFCViewer (int argc, char* argv[])
 		case Face3D::Quad3DType:
 			break;
 		case Face3D::Polygon3DType:
-			if (static_cast<const Polygon3D*>(face)->coords.size () == 3) {
-				vertexNum += static_cast<const Polygon3D*>(face)->coords.size ();
+			if (static_cast<const Polygon3D*>(face)->outerLoop.size () == 3) {
+				vertexNum += static_cast<const Polygon3D*>(face)->outerLoop.size ();
 				faceNum += 1;
 			}
 			break;
@@ -175,18 +233,18 @@ int IFCViewer (int argc, char* argv[])
 		case Face3D::Polygon3DType:
 			{
 				const Polygon3D* poly = static_cast<const Polygon3D*>(face);
-				if (poly->coords.size () == 3) {
+				if (poly->outerLoop.size () == 3) {
 					for (DWORD i = 0; i < 3; ++i) {
 						if (poly->bodyIndex != 0 && bodyVolumeMap[poly->bodyIndex] < 0.) {
-							V (vertexIndex + 2 - i, 0) = poly->coords[i][0];
-							V (vertexIndex + 2 - i, 1) = poly->coords[i][1];
-							V (vertexIndex + 2 - i, 2) = poly->coords[i][2];
+							V (vertexIndex + 2 - i, 0) = poly->outerLoop[i][0];
+							V (vertexIndex + 2 - i, 1) = poly->outerLoop[i][1];
+							V (vertexIndex + 2 - i, 2) = poly->outerLoop[i][2];
 
 						}
 						else {
-							V (vertexIndex + i, 0) = poly->coords[i][0];
-							V (vertexIndex + i, 1) = poly->coords[i][1];
-							V (vertexIndex + i, 2) = poly->coords[i][2];
+							V (vertexIndex + i, 0) = poly->outerLoop[i][0];
+							V (vertexIndex + i, 1) = poly->outerLoop[i][1];
+							V (vertexIndex + i, 2) = poly->outerLoop[i][2];
 
 						}
 					}
@@ -209,16 +267,20 @@ int IFCViewer (int argc, char* argv[])
 	{
 		Eigen::MatrixXd C (faceNum, 3);
 		int fidMin = 0;
-		int fidMax = faces3D.faces.size ();
+		int fidMax = 0;
+		int pid = 0;
+
 		for (int i = 0; i < faceProductPairs.size (); ++i) {
+			fidMax = faces3D.faces.size ();
 			if (i < faceProductPairs.size () - 1)
 				fidMax = faceProductPairs[i + 1].first;
 			if (fid >= faceProductPairs[i].first && fid < fidMax) {
 				fidMin = faceProductPairs[i].first;
+				pid = i;
 				break;
 			}
 		}
-		printf_s ("Select fid: %d vid: %d minf: %d maxf: %d\n", fid, vid, fidMin, fidMax);
+		printf_s ("Select stepID: %d fid: %d vid: %d minf: %d maxf: %d\n", faceProductPairs[pid].second, fid, vid, fidMin, fidMax);
 		for (int j = 0; j < faceNum; j++) {
 			const Face3D* face = faces3D.faces[j];
 			double r = face->color.x ();
